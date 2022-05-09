@@ -21,24 +21,30 @@ const CLNUnix = struct {
     /// The Unix socket with the path linked.
     socket: jsonrpc.JSONRPC,
 
-    pub fn call(self: *Self, method: []const u8, payload: []const u8) ![]const u8 {
+    pub fn call(self: *Self, method: []const u8, payload: []const u8) !Mock {
         _ = try self.socket.call("1", method, payload);
-        var stream = json.TokenStream.init("{}\n");
-        return json.parse([]const u8, &stream, .{});
+        const s =
+            \\ {
+            \\   "a": 15, "b": 12
+            \\ }
+        ;
+        var stream = json.TokenStream.init(s);
+        return json.parse(Mock, &stream, .{});
     }
 };
 
+const Mock = struct {
+    a: u8,
+    b: u8,
+};
+
 test "try to call core lightning Unix RPC method" {
-    const testing = @import("std").testing;
+    //    const testing = @import("std").testing;
     const os = @import("std").os;
-    const debug = @import("std").debug;
 
     const unix_path = os.getenv("CLN_UNIX") orelse "";
     var client: CLNUnix = CoreLNUnix(unix_path) catch {
         return;
     };
-    _ = client.call("getinfo", "{}") catch |err| {
-        debug.print("{s}", .{err});
-        try testing.expect(false);
-    };
+    _ = try client.call("getinfo", "{}");
 }

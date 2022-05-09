@@ -1,4 +1,7 @@
 name: "cln4zig: sanity check"
+
+on: [push, pull_request]
+
 jobs:
   test:
     strategy:

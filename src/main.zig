@@ -1,6 +1,7 @@
 /// Core lightning Client implementation
 ///
 /// author: https://github.com/vincenzopalazzo
+const std = @import("std");
 const net = @import("std").net;
 const json = @import("std").json;
 
@@ -21,15 +22,8 @@ const CLNUnix = struct {
     /// The Unix socket with the path linked.
     socket: jsonrpc.JSONRPC,
 
-    pub fn call(self: *Self, method: []const u8, payload: []const u8) !Mock {
-        _ = try self.socket.call("1", method, payload);
-        const s =
-            \\ {
-            \\   "a": 15, "b": 12
-            \\ }
-        ;
-        var stream = json.TokenStream.init(s);
-        return json.parse(Mock, &stream, .{});
+    pub fn call(self: *Self, method: []const u8, payload: json.ObjectMap) !json.Value {
+        return try self.socket.call("1", method, payload);
     }
 };
 
@@ -42,9 +36,10 @@ test "try to call core lightning Unix RPC method" {
     //    const testing = @import("std").testing;
     const os = @import("std").os;
 
-    const unix_path = os.getenv("CLN_UNIX") orelse "";
+    const unix_path = os.getenv("CLN_UNIX") orelse unreachable;
     var client: CLNUnix = CoreLNUnix(unix_path) catch {
         return;
     };
-    _ = try client.call("getinfo", "{}");
+    var allocator = std.heap.page_allocator;
+    _ = try client.call("getinfo", json.ObjectMap.init(allocator));
 }

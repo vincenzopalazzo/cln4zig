@@ -11,7 +11,7 @@ pub fn CoreLNUnix(path: []const u8) !CLNUnix {
     return CLNUnix{
         .socket = jsonrpc.JSONRPC{
             .version = "2.0",
-            .stream = try net.connectUnixSocket(path),
+            .stream = net.connectUnixSocket(path) catch unreachable,
         },
     };
 }
@@ -40,6 +40,7 @@ test "try to call core lightning Unix RPC method" {
     var client: CLNUnix = CoreLNUnix(unix_path) catch {
         return;
     };
-    var allocator = std.heap.page_allocator;
-    _ = try client.call("getinfo", json.ObjectMap.init(allocator));
+    var allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    // Looks like that we was not able to read all the json the the correct way
+    _ = try client.call("getinfo", json.ObjectMap.init(allocator.allocator()));
 }

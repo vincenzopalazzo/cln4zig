@@ -8,7 +8,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN apt-get update && apt-get install -y \
     software-properties-common build-essential wget tar && \
     wget https://ziglang.org/builds/zig-linux-x86_64-0.10.0-dev.3315+1a16b7214.tar.xz && \
-    tar -C /usr/local -xzf zig-linux-x86_64-0.10.0-dev.3315+1a16b7214.tar.xz
+    tar -C /usr/local -xf zig-linux-x86_64-0.10.0-dev.3315+1a16b7214.tar.xz
 
 # Install bitcoin core and lightningd (last version)
 RUN add-apt-repository ppa:luke-jr/bitcoincore
@@ -23,7 +23,7 @@ RUN wget https://github.com/ElementsProject/lightning/releases/download/v$CLIGHT
 RUN rm -r clightning-v$CLIGHTNING_VERSION-Ubuntu-20.04.tar.xz
 
 
-ENV PATH $PATH:/usr/local/go/bin
+ENV PATH $PATH:/usr/local/zig-linux-x86_64-0.10.0-dev.3315+1a16b7214/
 ENV PATH=/opt/clightning-v$CLIGHTNING_VERSION/bin:$PATH
 
 WORKDIR workdir

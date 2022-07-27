@@ -8,4 +8,4 @@ cd .. || exit 1
 ./run-clightning.sh
 cd code || exit 1
 ls -la
-CLN_PATH=/workdir/lightning_dir_one/regtest/lightning-rpc make check
+CLN_UNIX=/workdir/lightning_dir_one/regtest/lightning-rpc make check

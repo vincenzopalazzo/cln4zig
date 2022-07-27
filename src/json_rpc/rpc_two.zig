@@ -15,7 +15,7 @@ pub const JSONRPC = struct {
 
     pub fn call(self: *Self, id: []const u8, method: []const u8, payload: json.ObjectMap) !json.Value {
         var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-        defer arena.deinit();
+        //defer arena.deinit();
         var to_stream = try self.build_message(&arena, id, method, payload);
         _ = try self.stream.write(to_stream);
         return self.read(&arena);
@@ -49,6 +49,7 @@ pub const JSONRPC = struct {
             // }
             buffer.appendSlice(&tmp_buffer) catch unreachable;
             if (byte_read < size_buffer) {
+                try buffer.append(tmp_buffer[byte_read - 1]);
                 break;
             }
         }
@@ -63,11 +64,11 @@ pub const JSONRPC = struct {
             try clean_string.append(char);
         }
         string = clean_string.allocatedSlice();
-        //std.debug.print("{s}\n", .{string});
         var parser = std.json.Parser.init(arena.allocator(), false);
         defer parser.deinit();
-
+        std.debug.print("{s}", .{string});
         var json_tree = try parser.parse(string);
+        defer json_tree.deinit();
         return json_tree.root;
     }
 };

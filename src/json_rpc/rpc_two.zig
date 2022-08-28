@@ -24,6 +24,7 @@ pub const JSONRPC = struct {
     fn build_message(self: *Self, arena: *std.heap.ArenaAllocator, id: []const u8, method: []const u8, payload: json.ObjectMap) ![]const u8 {
         const allocator = arena.allocator();
         var request_tree = json.ObjectMap.init(allocator);
+        defer request_tree.deinit();
         try request_tree.put("id", std.json.Value{ .String = id });
         try request_tree.put("jsonrpc", std.json.Value{ .String = self.version });
         try request_tree.put("method", std.json.Value{ .String = method });
@@ -71,6 +72,6 @@ test "check parser function" {
 pub const ResponseObj = struct {
     id: ?[]const u8,
     jsonrpc: []const u8,
-    //errors: ?json.ObjectMap,
+    errors: ?json.ObjectMap,
     result: ?json.ObjectMap,
 };

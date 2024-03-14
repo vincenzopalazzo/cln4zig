@@ -17,7 +17,7 @@
         formatter = pkgs.nixpkgs-fmt;
 
         devShell = pkgs.mkShell {
-          buildInputs = [ pkgs.gnumake pkgs.zls zig.packages.${system}.master ];
+          buildInputs = [ pkgs.gnumake pkgs.zls zig.packages.${system}.default ];
         };
       }
   );

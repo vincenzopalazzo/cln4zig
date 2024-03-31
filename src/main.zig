@@ -1,31 +1,29 @@
-/// Core lightning Client implementation
-///
-/// author: https://github.com/vincenzopalazzo
+// Core lightning Client implementation
+//
+// author: https://github.com/vincenzopalazzo
 const std = @import("std");
-const net = @import("std").net;
-const json = @import("std").json;
+const json = std.json;
 
+const cln = @import("./plugin.zig");
 const jsonrpc = @import("./json_rpc/rpc_two.zig");
 
-pub fn CoreLNUnix(path: []const u8) !CLNUnix {
-    return CLNUnix{
-        .socket = jsonrpc.JSONRPC{
-            .version = "2.0",
-            .stream = try net.connectUnixSocket(path),
-        },
-    };
+fn SayHello(allocator: std.mem.Allocator, _: *cln.Plugin, _: *jsonrpc.Request) !jsonrpc.RPCResponse {
+    var result = json.ObjectMap.init(allocator);
+    try result.put("msg", json.Value{ .string = "hello from Zig" });
+    return .{ .result = json.Value{ .object = result } };
 }
+/// First example of plugin
+pub fn main() anyerror!void {
+    // A plugin need a global allocator
+    // to keep safe the global state of the plugin.
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    var allocator = arena.allocator();
+    defer arena.deinit();
+    var plugin = try cln.Plugin.init(allocator);
 
-const CLNUnix = struct {
-    const Self = @This();
-
-    /// The Unix socket with the path linked.
-    socket: jsonrpc.JSONRPC,
-
-    pub fn call(self: *Self, comptime T: type, allocator: std.mem.Allocator, method: []const u8, payload: json.ObjectMap) !T {
-        return try self.socket.call(T, allocator, "1", method, payload);
-    }
-};
+    try plugin.addMethod("hello", "", SayHello);
+    try plugin.start();
+}
 
 test "call a local core lightning node: Test 1" {
     const os = std.os;
@@ -35,7 +33,7 @@ test "call a local core lightning node: Test 1" {
     };
 
     const unix_path = os.getenv("CLN_UNIX") orelse return error.skip;
-    var client: CLNUnix = try CoreLNUnix(unix_path);
+    var client: jsonrpc.CLNUnix = try jsonrpc.CoreLNUnix(unix_path);
 
     var allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     var request = json.ObjectMap.init(allocator.allocator());

@@ -52,11 +52,13 @@ pub const JSONRPC = struct {
 };
 
 test "check parser function" {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    var parser = std.json.Parser.init(arena.allocator(), false);
-    defer parser.deinit();
+    const ResponseObj = struct {
+        id: ?[]const u8 = null,
+        jsonrpc: []const u8,
+    };
 
+    var arena = std.heap.GeneralPurposeAllocator(.{}){};
+    var allocator = arena.allocator();
     var string =
         \\ {"jsonrpc":"2.0","id":"1","result":{"id":"03b39d1ddf13ce486de74e9e44e0538f960401a9ec75534ba9cfe4100d65426880",
         \\ "alias":"SLICKERGOPHER-testnet","color":"02bf81","num_peers":20,"num_pending_channels":1,"num_active_channels":22,
@@ -66,12 +68,8 @@ test "check parser function" {
         \\ "network":"testnet","fees_collected_msat":30021,"lightning-dir":"/media/vincent/VincentSSD/.lightning/testnet",
         \\ "our_features":{"init":"08a080282269a2","node":"88a080282269a2","channel":"","invoice":"02000020024100"}}}
     ;
-    _ = try parser.parse(string);
+    var data = try json.parseFromSlice(ResponseObj, allocator, string, .{
+        .ignore_unknown_fields = true
+    });
+    data.deinit();
 }
-
-pub const ResponseObj = struct {
-    id: ?[]const u8,
-    jsonrpc: []const u8,
-    errors: ?json.ObjectMap,
-    result: ?json.ObjectMap,
-};

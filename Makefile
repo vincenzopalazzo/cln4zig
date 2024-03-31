@@ -7,4 +7,4 @@ fmt:
 	$(CC) fmt src/*.zig
 
 check:
-	$(CC) test src/*.zig
+	$(CC) build test --summary all

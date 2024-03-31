@@ -21,8 +21,15 @@ pub fn build(b: *std.build.Builder) void {
         .target = target,
         .optimize = optimize,
     });
+    const rpc2_tests = b.addTest(.{
+        .root_source_file = .{ .path = "src/json_rpc/rpc_two.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
     const run_main_tests = b.addRunArtifact(main_tests);
+    const run_lib_tests = b.addRunArtifact(rpc2_tests);
 
     const test_step = b.step("test", "Run library tests");
     test_step.dependOn(&run_main_tests.step);
+    test_step.dependOn(&run_lib_tests.step);
 }

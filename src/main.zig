@@ -26,19 +26,3 @@ const CLNUnix = struct {
         return try self.socket.call("1", method, payload);
     }
 };
-
-const Mock = struct {
-    a: u8,
-    b: u8,
-};
-
-test "try to call core lightning Unix RPC method" {
-    const os = @import("std").os;
-
-    const unix_path = os.getenv("CLN_UNIX") orelse unreachable;
-    var client: CLNUnix = CoreLNUnix(unix_path) catch {
-        return;
-    };
-    var allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    _ = try client.call("getinfo", json.ObjectMap.init(allocator.allocator()));
-}

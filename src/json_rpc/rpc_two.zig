@@ -7,10 +7,25 @@ const net = @import("std").net;
 const json = @import("std").json;
 const std = @import("std");
 
+const myjson = @import("../json/json.zig");
+
 pub const RPCError = struct {
     code: u64,
     message: []const u8,
     data: ?json.Value = null,
+};
+
+pub const Request = struct {
+    id: ?json.Value = null,
+    jsonrpc: []const u8,
+    method: []const u8,
+    params: json.Value,
+};
+
+pub const RPCResponse = struct {
+    id: ?json.Value = null,
+    result: ?json.Value = null,
+    err: ?RPCError = null,
 };
 
 pub const JSONRPC = struct {
@@ -29,7 +44,6 @@ pub const JSONRPC = struct {
         var to_stream = try self.buildRequest(allocator, id, method, payload);
 
         var str = std.ArrayList(u8).init(allocator);
-        // FIXME: make the writer a generic one.
         try json.stringify(to_stream, .{}, str.writer());
 
         _ = try self.stream.write(str.items);
@@ -48,10 +62,34 @@ pub const JSONRPC = struct {
         return json.Value{ .object = request_tree };
     }
 
+    pub fn buildSuccess(allocator: std.mem.Allocator, id: ?json.Value, result: json.Value) !json.Value {
+        var request_tree = json.ObjectMap.init(allocator);
+        if (id) |i| {
+            try request_tree.put("id", i);
+        }
+        try request_tree.put("jsonrpc", json.Value{ .string = "2.0" });
+        try request_tree.put("result", result);
+
+        return json.Value{ .object = request_tree };
+    }
+
+    pub fn buildError(allocator: std.mem.Allocator, id: ?json.Value, err: *const RPCError) !json.Value {
+        var request_tree = json.ObjectMap.init(allocator);
+        if (id) |i| {
+            try request_tree.put("id", i);
+        }
+
+        try request_tree.put("jsonrpc", json.Value{ .string = "2.0" });
+
+        var jsonErr = try myjson.marshall(allocator, err);
+        try request_tree.put("error", jsonErr);
+
+        return json.Value{ .object = request_tree };
+    }
+
     fn read(self: *Self, comptime T: type, allocator: std.mem.Allocator) !T {
         var reader = self.stream.reader();
         var buffer = std.ArrayList(u8).init(allocator);
-        defer buffer.deinit();
         try reader.readUntilDelimiterArrayList(&buffer, '\n', 40000);
 
         return try parseResponse(T, allocator, buffer.items);
@@ -98,3 +136,23 @@ test "check parser function" {
     };
     _ = try JSONRPC.parseResponse(GetInfo, allocator, string);
 }
+
+pub fn CoreLNUnix(path: []const u8) !CLNUnix {
+    return CLNUnix{
+        .socket = JSONRPC{
+            .version = "2.0",
+            .stream = try net.connectUnixSocket(path),
+        },
+    };
+}
+
+pub const CLNUnix = struct {
+    const Self = @This();
+
+    /// The Unix socket with the path linked.
+    socket: JSONRPC,
+
+    pub fn call(self: *Self, comptime T: type, allocator: std.mem.Allocator, method: []const u8, payload: json.ObjectMap) !T {
+        return try self.socket.call(T, allocator, "1", method, payload);
+    }
+};

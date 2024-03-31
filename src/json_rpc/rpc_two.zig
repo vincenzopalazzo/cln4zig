@@ -7,11 +7,23 @@ const net = @import("std").net;
 const json = @import("std").json;
 const std = @import("std");
 
+pub const RPCError = struct {
+    code: u64,
+    message: []const u8,
+    data: ?json.Value = null,
+};
+
 pub const JSONRPC = struct {
     const Self = @This();
 
     stream: net.Stream,
     version: []const u8,
+    /// We use this variable as a global variable to
+    /// Store last error that we have from a call.
+    ///
+    /// Curently in zig is complex return a detailed message,
+    /// so we use this way.
+    err: ?RPCError = null,
 
     pub fn call(self: *Self, comptime T: type, allocator: std.mem.Allocator, id: []const u8, method: []const u8, payload: json.ObjectMap) !T {
         var to_stream = try self.buildRequest(allocator, id, method, payload);
@@ -50,14 +62,22 @@ pub const JSONRPC = struct {
             id: ?[]const u8 = null,
             jsonrpc: []const u8,
             result: ?T = null,
-            err: ?json.Value = null,
+            @"error": ?RPCError = null,
         };
         var response = try std.json.parseFromSlice(Response, allocator, buffer, .{
             .ignore_unknown_fields = true,
         });
         defer response.deinit();
-        // FIXME: manage the error
-        return response.value.result orelse unreachable;
+        return response.value.result orelse error.RPCError;
+    }
+
+    /// Consuming the last error that happens during
+    /// the last call.
+    pub fn lastError(self: *Self) ?RPCError {
+        var err = self.err;
+        // after we read the value we set is to null again.
+        self.err = null;
+        return err;
     }
 };
 

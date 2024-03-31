@@ -22,7 +22,7 @@ const CLNUnix = struct {
     /// The Unix socket with the path linked.
     socket: jsonrpc.JSONRPC,
 
-    pub fn call(self: *Self, comptime T: type, allocator: std.mem.Allocator, method: []const u8, payload: anytype) !T {
+    pub fn call(self: *Self, comptime T: type, allocator: std.mem.Allocator, method: []const u8, payload: json.ObjectMap) !T {
         return try self.socket.call(T, allocator, "1", method, payload);
     }
 };

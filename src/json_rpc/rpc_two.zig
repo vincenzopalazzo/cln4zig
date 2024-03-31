@@ -13,53 +13,58 @@ pub const JSONRPC = struct {
     stream: net.Stream,
     version: []const u8,
 
-    pub fn call(self: *Self, id: []const u8, method: []const u8, payload: json.ObjectMap) !json.Value {
-        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-        defer arena.deinit();
-        var to_stream = try self.build_message(&arena, id, method, payload);
-        _ = try self.stream.write(to_stream);
-        return self.read(&arena);
-    }
-
-    fn build_message(self: *Self, arena: *std.heap.ArenaAllocator, id: []const u8, method: []const u8, payload: json.ObjectMap) ![]const u8 {
-        const allocator = arena.allocator();
-        var request_tree = json.ObjectMap.init(allocator);
-        defer request_tree.deinit();
-        try request_tree.put("id", std.json.Value{ .String = id });
-        try request_tree.put("jsonrpc", std.json.Value{ .String = self.version });
-        try request_tree.put("method", std.json.Value{ .String = method });
-        try request_tree.put("params", std.json.Value{ .Object = payload });
+    pub fn call(self: *Self, comptime T: type, allocator: std.mem.Allocator, id: []const u8, method: []const u8, payload: json.ObjectMap) !T {
+        var to_stream = try self.buildRequest(allocator, id, method, payload);
 
         var str = std.ArrayList(u8).init(allocator);
-        try json.stringify(json.Value{ .Object = request_tree }, .{}, str.writer());
-        return str.items;
+        // FIXME: make the writer a generic one.
+        try json.stringify(to_stream, .{}, str.writer());
+
+        _ = try self.stream.write(str.items);
+
+        return self.read(T, allocator);
     }
 
-    fn read(self: *Self, arena: *std.heap.ArenaAllocator) !json.Value {
+    fn buildRequest(self: *Self, allocator: std.mem.Allocator, id: []const u8, method: []const u8, payload: json.ObjectMap) !json.Value {
+        var request_tree = json.ObjectMap.init(allocator);
+
+        try request_tree.put("id", json.Value{ .string = id });
+        try request_tree.put("jsonrpc", json.Value{ .string = self.version });
+        try request_tree.put("method", json.Value{ .string = method });
+        try request_tree.put("params", json.Value{ .object = payload });
+
+        return json.Value{ .object = request_tree };
+    }
+
+    fn read(self: *Self, comptime T: type, allocator: std.mem.Allocator) !T {
         var reader = self.stream.reader();
-        var buffer = std.ArrayList(u8).init(arena.allocator());
+        var buffer = std.ArrayList(u8).init(allocator);
         defer buffer.deinit();
         try reader.readUntilDelimiterArrayList(&buffer, '\n', 40000);
-        var parser = std.json.Parser.init(arena.allocator(), false);
-        defer parser.deinit();
-        var string = buffer.toOwnedSlice();
-        std.debug.print("{s}\n", .{string});
-        std.debug.assert(std.json.validate(string) == true);
-        var json_tree = try parser.parse(string);
-        defer json_tree.deinit();
-        return json_tree.root;
+
+        return try parseResponse(T, allocator, buffer.items);
+    }
+
+    fn parseResponse(comptime T: type, allocator: std.mem.Allocator, buffer: []const u8) !T {
+        const Response = struct {
+            id: ?[]const u8 = null,
+            jsonrpc: []const u8,
+            result: ?T = null,
+            err: ?json.Value = null,
+        };
+        var response = try std.json.parseFromSlice(Response, allocator, buffer, .{
+            .ignore_unknown_fields = true,
+        });
+        defer response.deinit();
+        // FIXME: manage the error
+        return response.value.result orelse unreachable;
     }
 };
 
 test "check parser function" {
-    const ResponseObj = struct {
-        id: ?[]const u8 = null,
-        jsonrpc: []const u8,
-    };
-
     var arena = std.heap.GeneralPurposeAllocator(.{}){};
     var allocator = arena.allocator();
-    var string =
+    const string =
         \\ {"jsonrpc":"2.0","id":"1","result":{"id":"03b39d1ddf13ce486de74e9e44e0538f960401a9ec75534ba9cfe4100d65426880",
         \\ "alias":"SLICKERGOPHER-testnet","color":"02bf81","num_peers":20,"num_pending_channels":1,"num_active_channels":22,
         \\ "num_inactive_channels":0,"address":[{"type":"torv3","address":
@@ -68,8 +73,8 @@ test "check parser function" {
         \\ "network":"testnet","fees_collected_msat":30021,"lightning-dir":"/media/vincent/VincentSSD/.lightning/testnet",
         \\ "our_features":{"init":"08a080282269a2","node":"88a080282269a2","channel":"","invoice":"02000020024100"}}}
     ;
-    var data = try json.parseFromSlice(ResponseObj, allocator, string, .{
-        .ignore_unknown_fields = true
-    });
-    data.deinit();
+    const GetInfo = struct {
+        id: []const u8,
+    };
+    _ = try JSONRPC.parseResponse(GetInfo, allocator, string);
 }
